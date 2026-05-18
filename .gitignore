@@ -1,10 +1,13 @@
 # Dependency directories
 node_modules/
 **/node_modules/
+jspm_packages/
+web_modules/
 
 # Next.js build
 .next/
 **/.next/
+out/
 
 # Backend build output
 dist/
@@ -16,6 +19,8 @@ dist/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*
+!.env.example
 **/.env
 **/.env.local
 
@@ -40,7 +45,29 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+.eslintcache
+.stylelintcache
 
 # TS build info
 *.tsbuildinfo
 **/*.tsbuildinfo
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage
+*.lcov
+.nyc_output
+
+# Caches
+.cache
+.parcel-cache
+.pnpm-store
+.vite/
