@@ -6,6 +6,9 @@ import ChatBubble from './ChatBubble';
 import MessageInput from './MessageInput';
 import Avatar from '../design/Avatar';
 import { User } from '../../types';
+import { useAuthStore } from '../../store/authStore';
+import { useCallStore } from '../../store/callStore';
+import { FiPhone, FiVideo } from 'react-icons/fi';
 
 interface ChatWindowProps {
   currentUserId: string;
@@ -13,8 +16,77 @@ interface ChatWindowProps {
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ currentUserId }) => {
   const { currentChat, messages, setMessages, deleteMessage, setLoading } = useChatStore();
-  const { sendMessage } = useSocket(currentUserId);
+  const { sendMessage, socket } = useSocket(currentUserId);
+  const { user } = useAuthStore();
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const participant = currentChat?.participants.find(
+    (p) => (typeof p === 'string' ? p : p.id || p._id) !== currentUserId
+  ) as User | undefined;
+
+  const handleVoiceCall = async () => {
+    if (!participant || !socket) return;
+    try {
+      const response = await fetch('http://localhost:3333/api/calls/initiate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('kaeapp_token')}`,
+        },
+        body: JSON.stringify({ recipientId: participant._id || participant.id, type: 'voice' }),
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        const callId = result.data._id;
+        const peer = { id: participant._id || participant.id, name: participant.username, avatar: participant.avatar };
+        useCallStore.getState().setOutgoing(callId, 'voice', peer);
+        
+        socket.emit('call-user', {
+          callId,
+          recipientId: peer.id,
+          type: 'voice',
+          from: currentUserId,
+          callerName: user?.username || 'You',
+          callerAvatar: user?.avatar,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to start voice call:', err);
+    }
+  };
+
+  const handleVideoCall = async () => {
+    if (!participant || !socket) return;
+    try {
+      const response = await fetch('http://localhost:3333/api/calls/initiate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('kaeapp_token')}`,
+        },
+        body: JSON.stringify({ recipientId: participant._id || participant.id, type: 'video' }),
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        const callId = result.data._id;
+        const peer = { id: participant._id || participant.id, name: participant.username, avatar: participant.avatar };
+        useCallStore.getState().setOutgoing(callId, 'video', peer);
+        
+        socket.emit('call-user', {
+          callId,
+          recipientId: peer.id,
+          type: 'video',
+          from: currentUserId,
+          callerName: user?.username || 'You',
+          callerAvatar: user?.avatar,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to start video call:', err);
+    }
+  };
 
   useEffect(() => {
     if (currentChat) {
@@ -51,9 +123,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ currentUserId }) => {
     );
   }
 
-  const participant = currentChat.participants.find(
-    (p) => (typeof p === 'string' ? p : p.id || p._id) !== currentUserId
-  ) as User;
+
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#09090b]/40 overflow-hidden">
@@ -64,6 +134,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ currentUserId }) => {
             <h3 className="font-bold text-white text-lg">{participant?.username}</h3>
             <span className="text-[11px] font-black text-green-500 uppercase tracking-widest">Online</span>
           </div>
+        </div>
+
+        <div className="flex items-center space-x-4">
+          <button 
+            onClick={handleVoiceCall}
+            className="p-2 text-zinc-400 hover:text-white transition-colors"
+          >
+            <FiPhone className="h-5 w-5" />
+          </button>
+          <button 
+            onClick={handleVideoCall}
+            className="p-2 text-zinc-400 hover:text-white transition-colors"
+          >
+            <FiVideo className="h-5 w-5" />
+          </button>
         </div>
       </header>
 

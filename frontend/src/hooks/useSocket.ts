@@ -42,6 +42,7 @@ export const useSocket = (userId?: string) => {
     if (!globalSocket) {
       globalSocket = io(SOCKET_URL, {
         auth: { token },
+        query: { userId },
         transports: ['websocket'],
         reconnection: true,
         reconnectionAttempts: 10,

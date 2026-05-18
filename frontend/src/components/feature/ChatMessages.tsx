@@ -8,8 +8,6 @@ import ChatBubble from './ChatBubble';
 import MessageInput from './MessageInput';
 import Avatar from '../design/Avatar';
 import ProfileModal from './ProfileModal';
-import IncomingCallModal from './IncomingCallModal';
-import ActiveCallScreen from './ActiveCallScreen';
 import { User, Message } from '../../types';
 import { FiPhone, FiVideo, FiSmile } from 'react-icons/fi';
 
@@ -39,32 +37,8 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ currentUserId }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Simple call state
-  const [incomingCall, setIncomingCall] = React.useState<any>(null);
-  const [activeCall, setActiveCall] = React.useState<any>(null);
-
   React.useEffect(() => {
     if (!socket) return;
-
-    socket.on('call:incoming', (data: any) => {
-      console.log('Simple incoming call:', data);
-      setIncomingCall(data);
-    });
-
-    socket.on('call:accepted', (data: any) => {
-      console.log('Simple call accepted:', data);
-      setActiveCall(data);
-      setIncomingCall(null);
-    });
-
-    socket.on('call:rejected', () => {
-      setIncomingCall(null);
-    });
-
-    socket.on('call:ended', () => {
-      setActiveCall(null);
-      setIncomingCall(null);
-    });
 
     socket.on('message:deleted', (data: { messageId: string }) => {
       // Use getState to avoid dependency on 'messages' array which causes re-subscriptions
@@ -76,10 +50,6 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ currentUserId }) => {
     });
 
     return () => {
-      socket.off('call:incoming');
-      socket.off('call:accepted');
-      socket.off('call:rejected');
-      socket.off('call:ended');
       socket.off('message:deleted');
     };
   }, [socket, setMessages]);
@@ -180,7 +150,6 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ currentUserId }) => {
 
   const handleVoiceCall = async () => {
     if (!participant || !socket) return;
-    console.log('Starting simple voice call...');
     
     try {
       const response = await fetch('http://localhost:3333/api/calls/initiate', {
@@ -194,25 +163,26 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ currentUserId }) => {
       const result = await response.json();
       
       if (result.success) {
-        const callData = {
-          callId: result.data._id,
-          recipientId: participant._id || participant.id,
+        const callId = result.data._id;
+        const peer = { id: participant._id || participant.id, name: participant.username, avatar: participant.avatar };
+        useCallStore.getState().setOutgoing(callId, 'voice', peer);
+        
+        socket.emit('call-user', {
+          callId,
+          recipientId: peer.id,
           type: 'voice',
           from: currentUserId,
           callerName: user?.username || 'You',
           callerAvatar: user?.avatar,
-        };
-        setActiveCall(callData);
-        socket.emit('call:initiate', callData);
+        });
       }
     } catch (err) {
-      console.error('Failed to start simple call:', err);
+      console.error('Failed to start voice call:', err);
     }
   };
 
   const handleVideoCall = async () => {
     if (!participant || !socket) return;
-    console.log('Starting simple video call...');
     
     try {
       const response = await fetch('http://localhost:3333/api/calls/initiate', {
@@ -226,39 +196,22 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ currentUserId }) => {
       const result = await response.json();
       
       if (result.success) {
-        const callData = {
-          callId: result.data._id,
-          recipientId: participant._id || participant.id,
+        const callId = result.data._id;
+        const peer = { id: participant._id || participant.id, name: participant.username, avatar: participant.avatar };
+        useCallStore.getState().setOutgoing(callId, 'video', peer);
+        
+        socket.emit('call-user', {
+          callId,
+          recipientId: peer.id,
           type: 'video',
           from: currentUserId,
           callerName: user?.username || 'You',
           callerAvatar: user?.avatar,
-        };
-        setActiveCall(callData);
-        socket.emit('call:initiate', callData);
+        });
       }
     } catch (err) {
-      console.error('Failed to start simple call:', err);
+      console.error('Failed to start video call:', err);
     }
-  };
-
-  const handleAcceptCall = () => {
-    if (!incomingCall || !socket) return;
-    socket.emit('call:accept', { callerId: incomingCall.from, callId: incomingCall.callId });
-    setActiveCall(incomingCall);
-    setIncomingCall(null);
-  };
-
-  const handleRejectCall = () => {
-    if (!incomingCall || !socket) return;
-    socket.emit('call:reject', { callerId: incomingCall.from, callId: incomingCall.callId });
-    setIncomingCall(null);
-  };
-
-  const handleEndCall = () => {
-    if (!activeCall || !socket) return;
-    socket.emit('call:end', { to: activeCall.recipientId || activeCall.from, callId: activeCall.callId });
-    setActiveCall(null);
   };
 
   const participant = currentChat.participants.find(
